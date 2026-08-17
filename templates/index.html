@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f7f8ff" />
+    <meta
+      name="description"
+      content="Voice Desk is a professional NVIDIA-powered voice conversation workspace."
+    />
+    <title>Voice Desk · NVIDIA AI Voice</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body data-mode="ready">
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Voice Desk home">
+        <span class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+        <span class="brand-copy">
+          <strong>Voice Desk</strong>
+          <small>NVIDIA AI voice workspace</small>
+        </span>
+      </a>
+
+      <div class="topbar-actions">
+        <div class="connection-chip" id="connectionChip" role="status">
+          <span class="status-dot"></span>
+          <span id="connectionLabel">Connecting</span>
+        </div>
+        <button class="icon-button" id="themeInfoButton" aria-label="About this experience">
+          <span class="material-symbols-rounded" aria-hidden="true">info</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <section class="intro" aria-labelledby="pageTitle">
+        <div>
+          <p class="eyebrow"><span></span> CONVERSATIONAL INTELLIGENCE</p>
+          <h1 id="pageTitle">Speak naturally.<br /><em>Hear clarity.</em></h1>
+        </div>
+        <p class="intro-copy">
+          A live NVIDIA voice agent listens, reasons with context, and streams a natural
+          Magpie response with interruption built in.
+        </p>
+      </section>
+
+      <nav class="experience-tabs" role="tablist" aria-label="Conversation mode">
+        <button
+          class="experience-tab active"
+          id="voiceTab"
+          type="button"
+          role="tab"
+          aria-selected="true"
+          aria-controls="voiceTabPanel"
+          data-tab="voice"
+        >
+          <span class="material-symbols-rounded" aria-hidden="true">mic</span>
+          Voice conversation
+        </button>
+        <button
+          class="experience-tab"
+          id="chatTab"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="chatTabPanel"
+          data-tab="chat"
+        >
+          <span class="material-symbols-rounded" aria-hidden="true">chat</span>
+          Text chat
+        </button>
+      </nav>
+
+      <section class="context-dock" id="contextDock" aria-labelledby="contextTitle">
+        <div class="context-summary">
+          <span class="context-icon material-symbols-rounded" aria-hidden="true">description</span>
+          <div>
+            <p class="overline">ANSWER SOURCE</p>
+            <strong id="contextTitle">Optional reference file</strong>
+            <span id="contextDescription">
+              No file selected. The agent can use its existing knowledge.
+            </span>
+          </div>
+        </div>
+        <div class="context-actions">
+          <span class="context-mode-chip" id="contextModeChip">GENERAL KNOWLEDGE</span>
+          <input
+            class="sr-only"
+            id="contextFileInput"
+            type="file"
+            accept=".pdf,.docx,.txt,.md,.csv,.json,.xml,.yaml,.yml,.log"
+          />
+          <button class="context-upload-button" id="contextUploadButton" type="button">
+            <span class="material-symbols-rounded" aria-hidden="true">upload_file</span>
+            <span id="contextUploadLabel">Upload context</span>
+          </button>
+          <button class="context-clear-button" id="contextClearButton" type="button" disabled>
+            <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+            Clear file
+          </button>
+        </div>
+      </section>
+
+      <section id="voiceTabPanel" role="tabpanel" aria-labelledby="voiceTab">
+        <div class="workspace-grid">
+          <section class="transcript-card" aria-labelledby="transcriptTitle">
+            <div class="card-heading">
+              <div>
+                <p class="overline">LIVE SESSION</p>
+                <h2 id="transcriptTitle">Your transcription</h2>
+              </div>
+              <button class="text-button" id="resetVoiceButton" type="button">
+                <span class="material-symbols-rounded" aria-hidden="true">refresh</span>
+                New voice session
+              </button>
+            </div>
+
+            <div class="transcript-surface" id="transcriptSurface">
+              <div class="transcript-mark" aria-hidden="true">
+                <span class="material-symbols-rounded">mic</span>
+              </div>
+              <p class="transcript-kicker">LIVE TRANSCRIPT</p>
+              <p class="transcript-text placeholder" id="voiceTranscript" aria-live="polite">
+                Your words will appear here as you speak.
+              </p>
+              <div class="transcript-footer">
+                <span id="transcriptWordCount">0 words</span>
+                <span><span class="privacy-dot"></span> NVIDIA streaming ASR</span>
+              </div>
+            </div>
+
+            <div class="voice-flow" aria-label="Voice response workflow">
+              <div class="flow-step active" id="captureStep">
+                <span>1</span>
+                <div><strong>Capture</strong><small>Speak your question</small></div>
+              </div>
+              <span class="flow-line" aria-hidden="true"></span>
+              <div class="flow-step" id="reasonStep">
+                <span>2</span>
+                <div><strong>Reason</strong><small>Prepare the answer</small></div>
+              </div>
+              <span class="flow-line" aria-hidden="true"></span>
+              <div class="flow-step" id="speakStep">
+                <span>3</span>
+                <div><strong>Respond</strong><small>Hear Magpie speak</small></div>
+              </div>
+            </div>
+
+            <div class="automatic-note">
+              <span class="material-symbols-rounded" aria-hidden="true">auto_awesome</span>
+              <p><strong>Continuous agent session</strong> Stop recording to finish the turn; start again to continue with the same context.</p>
+            </div>
+          </section>
+
+          <aside class="voice-panel" aria-labelledby="voiceControlTitle">
+            <div class="voice-panel-head">
+              <div>
+                <p class="overline">VOICE CONTROL</p>
+                <h2 id="voiceControlTitle">Talk to Voice Desk</h2>
+              </div>
+              <span class="mode-badge" id="modeBadge">READY</span>
+            </div>
+
+            <div class="voice-stage" id="voiceStage">
+              <div class="orbital-ring ring-one" aria-hidden="true"></div>
+              <div class="orbital-ring ring-two" aria-hidden="true"></div>
+              <button class="mic-button" id="micButton" type="button" aria-label="Start recording">
+                <span class="material-symbols-rounded mic-icon" aria-hidden="true">mic</span>
+                <span class="material-symbols-rounded stop-icon" aria-hidden="true">stop</span>
+              </button>
+              <div class="waveform" aria-hidden="true">
+                <span></span><span></span><span></span><span></span><span></span>
+                <span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+
+            <div class="voice-status" aria-live="polite">
+              <strong id="voiceStatusTitle">Tap to start talking</strong>
+              <span id="voiceStatusDetail">Stop recording when your question is complete.</span>
+            </div>
+
+            <div class="input-controls">
+              <button class="control-button primary-control" id="recordButton" type="button">
+                <span class="material-symbols-rounded" aria-hidden="true">mic</span>
+                <span id="recordButtonLabel">Start recording</span>
+              </button>
+              <button
+                class="control-button"
+                id="muteButton"
+                type="button"
+                aria-pressed="false"
+              >
+                <span class="material-symbols-rounded" aria-hidden="true">mic_off</span>
+                <span id="muteButtonLabel">Mute input</span>
+              </button>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="voice-settings">
+              <label>
+                <span>Language</span>
+                <span class="select-wrap">
+                  <select id="languageSelect">
+                    <option value="en-US" selected>English (United States)</option>
+                    <option value="es-US">Spanish (United States)</option>
+                    <option value="fr-FR">French (France)</option>
+                  </select>
+                  <span class="material-symbols-rounded" aria-hidden="true">expand_more</span>
+                </span>
+              </label>
+              <label>
+                <span>Voice</span>
+                <span class="select-wrap">
+                  <select id="voiceSelect">
+                    <option value="Magpie-Multilingual.EN-US.Aria" selected>Aria · warm, clear</option>
+                  </select>
+                  <span class="material-symbols-rounded" aria-hidden="true">expand_more</span>
+                </span>
+              </label>
+            </div>
+
+            <div class="spoken-response" id="spokenResponse">
+              <div class="spoken-response-head">
+                <span class="material-symbols-rounded" aria-hidden="true">volume_up</span>
+                <div><small>SPOKEN RESPONSE</small><strong id="spokenResponseStatus">Waiting for your question</strong></div>
+              </div>
+              <audio id="responseAudio" controls preload="none"></audio>
+              <button class="stop-voice-button" id="stopVoiceButton" type="button" disabled>
+                <span class="material-symbols-rounded" aria-hidden="true">stop_circle</span>
+                Stop spoken response
+              </button>
+            </div>
+
+            <div class="model-note">
+              <span class="model-icon material-symbols-rounded" aria-hidden="true">memory</span>
+              <div>
+                <span>AGENT PIPELINE</span>
+                <strong>ASR · Nemotron LLM · Magpie TTS</strong>
+              </div>
+              <span class="verified material-symbols-rounded" aria-label="Configured">verified</span>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="chatTabPanel" role="tabpanel" aria-labelledby="chatTab" hidden>
+        <section class="conversation-card chat-card" aria-labelledby="conversationTitle">
+          <div class="card-heading">
+            <div>
+              <p class="overline">TEXT WORKSPACE</p>
+              <h2 id="conversationTitle">Chat with Voice Desk</h2>
+            </div>
+            <div class="heading-actions">
+              <span class="text-only-chip">TEXT ONLY</span>
+              <button class="text-button" id="resetChatButton" type="button">
+                <span class="material-symbols-rounded" aria-hidden="true">refresh</span>
+                New chat
+              </button>
+            </div>
+          </div>
+
+          <div class="conversation-feed" id="chatConversationFeed" aria-live="polite">
+            <article class="welcome-message" id="chatWelcomeMessage">
+              <div class="assistant-avatar" aria-hidden="true">
+                <span class="material-symbols-rounded">chat</span>
+              </div>
+              <div>
+                <span class="message-label">VOICE DESK CHAT</span>
+                <h3>Prefer typing? Start here.</h3>
+                <p>
+                  This tab keeps the full written conversation visible. Voice playback stays in
+                  the Voice conversation tab.
+                </p>
+                <div class="suggestions" aria-label="Suggested questions">
+                  <button type="button" data-chat-prompt="Summarize three priorities for a productive workday.">
+                    Plan my priorities
+                  </button>
+                  <button type="button" data-chat-prompt="Give me a concise update I can use to open a project meeting.">
+                    Draft a meeting opener
+                  </button>
+                  <button type="button" data-chat-prompt="Explain generative AI in simple business terms.">
+                    Explain a concept
+                  </button>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="composer-wrap">
+            <label class="sr-only" for="chatInput">Your message</label>
+            <textarea
+              id="chatInput"
+              rows="2"
+              maxlength="4000"
+              placeholder="Type your message…"
+            ></textarea>
+            <div class="composer-actions">
+              <span class="composer-hint">Ctrl + Enter to send</span>
+              <button class="send-button" id="chatSendButton" type="button">
+                <span>Send message</span>
+                <span class="material-symbols-rounded" aria-hidden="true">arrow_upward</span>
+              </button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <footer>
+        <p><span class="privacy-dot"></span> Microphone audio streams to NVIDIA ASR only while recording.</p>
+        <p>Pipecat · NVIDIA NIM</p>
+      </footer>
+    </main>
+
+    <dialog id="aboutDialog">
+      <button class="dialog-close icon-button" id="dialogCloseButton" aria-label="Close">
+        <span class="material-symbols-rounded" aria-hidden="true">close</span>
+      </button>
+      <span class="dialog-icon material-symbols-rounded" aria-hidden="true">record_voice_over</span>
+      <p class="overline">ABOUT VOICE DESK</p>
+      <h2>Two focused ways to work</h2>
+      <p>
+        Voice conversation is a stateful Pipecat agent with NVIDIA streaming ASR, a Nemotron
+        LLM, Magpie speech, voice activity detection, and interruption. Text chat remains a
+        separate workspace for written questions and answers.
+      </p>
+      <button class="control-button primary-control" id="dialogDoneButton" type="button">Got it</button>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
