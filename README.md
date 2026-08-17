@@ -17,6 +17,11 @@ The voice architecture follows the
 Only the user's transcription appears in the Voice tab. The separate **Text chat** tab keeps
 typed questions and written answers visible.
 
+Voice sessions include dropdowns for 12 languages, 10 Magpie speakers, and eight emotional
+styles. Voice Desk composes these selections into NVIDIA's hierarchical Magpie voice name;
+changing any selection starts a fresh voice session on the next recording. Styles unavailable
+for the selected speaker remain visible but disabled, and service errors appear inline.
+
 An optional reference-file control is shared by both tabs. When a file is active, Voice Desk
 answers strictly from that file and says when the requested information is not present. Clearing
 the file restores the normal general-knowledge behavior. Uploaded content is held in server

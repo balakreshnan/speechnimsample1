@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import app
 from text_utils import plain_conversation_text
+from voice_catalog import EMOTIONS, LANGUAGES, SPEAKERS, build_magpie_voice
 
 
 class VoiceDeskIntegrationTests(unittest.TestCase):
@@ -70,12 +71,22 @@ class VoiceDeskIntegrationTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn("text/html", headers["Content-Type"])
         self.assertIn(b"Voice Desk", body)
+        for locale in LANGUAGES:
+            self.assertIn(f'value="{locale}"'.encode(), body)
+        for speaker in SPEAKERS:
+            self.assertIn(f'value="{speaker}"'.encode(), body)
+        for emotion in EMOTIONS:
+            self.assertIn(f'value="{emotion}"'.encode(), body)
+        self.assertIn(b'id="voiceError"', body)
 
         status, headers, body = self.request("GET", "/static/app.js")
         self.assertEqual(status, 200)
         self.assertIn("javascript", headers["Content-Type"])
         self.assertIn(b"startRecording", body)
         self.assertIn(b"RTCPeerConnection", body)
+        self.assertIn(b"applyVoiceCompatibility", body)
+        self.assertIn(b"emotionSelect", body)
+        self.assertIn(b"showVoiceError", body)
         self.assertNotIn(b"SpeechRecognition", body)
 
         status, headers, body = self.request("GET", "/static/styles.css")
@@ -92,6 +103,11 @@ class VoiceDeskIntegrationTests(unittest.TestCase):
         self.assertNotIn("test-key-never-sent-to-client", body.decode())
         self.assertEqual(payload["tts_model"], app.DEFAULT_TTS_MODEL)
         self.assertEqual(payload["voice_agent"]["runtime"], "pipecat-native")
+        self.assertEqual(
+            payload["voice_catalog"]["speakers"]["Aria"]["emotions"],
+            ["Neutral", "Calm", "Angry", "Sad"],
+        )
+        self.assertIn("Disgust", payload["voice_catalog"]["emotions"])
 
     @patch("app.request_agent")
     def test_webrtc_offer_is_proxied_to_native_agent(self, request_agent) -> None:
@@ -100,15 +116,23 @@ class VoiceDeskIntegrationTests(unittest.TestCase):
             "sdp": "offer-sdp",
             "type": "offer",
             "request_data": {
-                "language": "en-US",
-                "voice": "Magpie-Multilingual.EN-US.Aria",
+                "language": "ar-AR",
+                "speaker": "Sofia",
+                "emotion": "Calm",
             },
         }
         status, _, body = self.request("POST", "/api/agent/offer", offer)
 
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(body)["pc_id"], "pc-1")
-        request_agent.assert_called_once_with("/api/offer", offer)
+        forwarded = request_agent.call_args.args[1]
+        self.assertEqual(forwarded["request_data"]["language"], "ar-XA")
+        self.assertEqual(
+            forwarded["request_data"]["voice"],
+            "Magpie-Multilingual.EN-US.Sofia.Calm",
+        )
+        self.assertEqual(forwarded["request_data"]["speaker"], "Sofia")
+        self.assertEqual(forwarded["request_data"]["emotion"], "Calm")
 
     @patch("app._upstream_request")
     def test_chat_endpoint_returns_reasoned_answer(self, upstream) -> None:
@@ -284,8 +308,9 @@ class VoiceDeskIntegrationTests(unittest.TestCase):
             "/api/synthesize",
             {
                 "text": "Hello from Voice Desk.",
-                "language": "en-US",
-                "voice": "Magpie-Multilingual.EN-US.Aria",
+                "language": "hi-IN",
+                "speaker": "Isabela",
+                "emotion": "Happy",
             },
         )
         self.assertEqual(status, 200)
@@ -296,6 +321,11 @@ class VoiceDeskIntegrationTests(unittest.TestCase):
         self.assertIn("multipart/form-data", outgoing.headers["Content-type"])
         self.assertIn(b'name="encoding"\r\n\r\nLINEAR_PCM', outgoing.data)
         self.assertIn(b'name="sample_rate_hz"\r\n\r\n22050', outgoing.data)
+        self.assertIn(b'name="language"\r\n\r\nhi-IN', outgoing.data)
+        self.assertIn(
+            b'name="voice"\r\n\r\nMagpie-Multilingual.ES-US.Isabela.Happy',
+            outgoing.data,
+        )
 
     def test_invalid_requests_are_rejected_before_upstream_call(self) -> None:
         status, _, body = self.request("POST", "/api/chat", {"message": "", "history": []})
@@ -309,6 +339,32 @@ class VoiceDeskIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(status, 400)
         self.assertIn("language", json.loads(body)["error"].lower())
+
+        status, _, body = self.request(
+            "POST",
+            "/api/synthesize",
+            {
+                "text": "Hello",
+                "language": "en-US",
+                "speaker": "Unknown",
+                "emotion": "Calm",
+            },
+        )
+        self.assertEqual(status, 400)
+        self.assertIn("speaker", json.loads(body)["error"].lower())
+
+        status, _, body = self.request(
+            "POST",
+            "/api/synthesize",
+            {
+                "text": "Hello",
+                "language": "en-US",
+                "speaker": "Aria",
+                "emotion": "Happy",
+            },
+        )
+        self.assertEqual(status, 400)
+        self.assertIn("does not support", json.loads(body)["error"].lower())
 
     @patch("app.time.sleep")
     @patch("app.urlopen")
@@ -344,6 +400,31 @@ class VoiceDeskIntegrationTests(unittest.TestCase):
             settings.default_voice,
             "Magpie-Multilingual.EN-US.Aria",
         )
+        language, voice = voice_agent._session_preferences(
+            {
+                "language": "ar-AR",
+                "speaker": "Ray",
+                "emotion": "Fearful",
+            },
+            settings,
+        )
+        self.assertEqual(language.value, "ar-XA")
+        self.assertEqual(
+            voice,
+            "Magpie-Multilingual.EN-US.Ray.Fearful",
+        )
+        self.assertEqual(
+            build_magpie_voice("pt-BR", "Diego", "PleasantSurprised"),
+            "Magpie-Multilingual.ES-US.Diego.PleasantSurprised",
+        )
+        with self.assertRaises(ValueError):
+            build_magpie_voice("pt-BR", "Diego", "Disgust")
+        visible_error = voice_agent._user_facing_pipeline_error(
+            "INVALID_ARGUMENT: subvoice requested not found",
+            "Aria",
+            "Happy",
+        )
+        self.assertIn("Aria does not support the Happy emotion", visible_error)
         grounded = voice_agent._session_system_prompt(
             {
                 "context_filename": "policy.txt",
