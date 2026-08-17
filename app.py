@@ -26,6 +26,8 @@ from xml.etree import ElementTree
 
 from pypdf import PdfReader
 
+from text_utils import plain_conversation_text
+
 
 ROOT = Path(__file__).resolve().parent
 STATIC_DIR = ROOT / "static"
@@ -44,7 +46,7 @@ DEFAULT_CHAT_BASE_URL = "https://inference-api.nvidia.com/v1"
 DEFAULT_CHAT_MODEL = "meta/llama-3.3-70b-instruct"
 DEFAULT_AGENT_HOST = "127.0.0.1"
 DEFAULT_AGENT_PORT = 7861
-MAX_CONTEXT_FILE_BYTES = 10 * 1024 * 1024
+MAX_CONTEXT_FILE_BYTES = 50 * 1024 * 1024
 MAX_CONTEXT_CHARS = 120_000
 CONTEXT_TTL_SECONDS = 4 * 60 * 60
 SUPPORTED_CONTEXT_EXTENSIONS = {
@@ -373,8 +375,10 @@ def request_chat(
                 (
                     "You are Voice Desk, a concise and capable business assistant. "
                     "Answer the user's question directly in the same language they use. "
-                    "Prefer clear phrasing, avoid markdown tables, and keep most answers "
-                    "under 100 words unless the user explicitly requests detail."
+                    "Return plain conversational text only. Never use Markdown, asterisks, "
+                    "headings, bullet symbols, code fences, or other formatting markers. "
+                    "Prefer clear phrasing and keep most answers under 100 words unless "
+                    "the user explicitly requests detail."
                 ),
                 context,
             ),
@@ -420,7 +424,7 @@ def request_chat(
     except (UnicodeDecodeError, json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
         raise ApiError("The reasoning service returned an unexpected response.") from exc
 
-    answer = re.sub(r"<think>.*?</think>", "", answer, flags=re.DOTALL | re.IGNORECASE).strip()
+    answer = plain_conversation_text(answer)
     if not answer:
         raise ApiError("The reasoning service returned an empty response.")
     return answer
@@ -447,6 +451,10 @@ def request_speech(
 ) -> tuple[bytes, str]:
     if not settings.api_key:
         raise ApiError("Add NVIDIA_API_KEY to .env before creating speech.", 503)
+
+    text = plain_conversation_text(text)
+    if not text:
+        raise ApiError("There is no readable text to speak.", 400)
 
     body, content_type = encode_multipart(
         {
@@ -512,7 +520,7 @@ def read_binary_body(
     if length <= 0:
         raise ApiError("Choose a non-empty file to upload.", HTTPStatus.BAD_REQUEST)
     if length > max_bytes:
-        raise ApiError("Context files must be 10 MB or smaller.", HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
+        raise ApiError("Context files must be 50 MB or smaller.", HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
     data = handler.rfile.read(length)
     if len(data) != length:
         raise ApiError("The file upload was incomplete.", HTTPStatus.BAD_REQUEST)

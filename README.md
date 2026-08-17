@@ -23,7 +23,7 @@ the file restores the normal general-knowledge behavior. Uploaded content is hel
 memory only, expires after four hours, and is not written to disk.
 
 Supported context formats are PDF, DOCX, TXT, Markdown, CSV, JSON, XML, YAML, and LOG files up
-to 10 MB. Up to 120,000 extracted characters are used; scanned PDFs need OCR before upload.
+to 50 MB. Up to 120,000 extracted characters are used; scanned PDFs need OCR before upload.
 
 ## Requirements
 

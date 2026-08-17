@@ -639,8 +639,8 @@ async function resetConversationsForContextChange() {
 
 async function uploadContextFile(file) {
   if (!file || state.contextBusy) return;
-  if (file.size > 10 * 1024 * 1024) {
-    showToast("Choose a context file that is 10 MB or smaller.");
+  if (file.size > 50 * 1024 * 1024) {
+    showToast("Choose a context file that is 50 MB or smaller.");
     return;
   }
 

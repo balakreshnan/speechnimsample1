@@ -49,6 +49,8 @@ from pipecat.transports.smallwebrtc.request_handler import (
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 from pipecat.workers.runner import WorkerRunner
 
+from text_utils import plain_conversation_text
+
 
 DEFAULT_AGENT_LLM_MODEL = "nvidia/nemotron-3-nano-30b-a3b"
 DEFAULT_AGENT_LLM_BASE_URL = "https://integrate.api.nvidia.com/v1"
@@ -72,8 +74,10 @@ DEFAULT_HUB_TTS_FALLBACK_ENDPOINT = (
 SYSTEM_PROMPT = (
     "You are Voice Desk, a polished business voice agent. Answer the user's question "
     "directly and naturally in the language they use. Keep most spoken responses under "
-    "100 words unless the user asks for detail. Avoid markdown tables, long lists, and "
-    "phrasing that sounds awkward when read aloud. Maintain context across turns."
+    "100 words unless the user asks for detail. Return plain conversational text only. "
+    "Never use Markdown, asterisks, headings, bullet symbols, code fences, or other "
+    "formatting markers. Use phrasing that sounds natural when read aloud and maintain "
+    "context across turns."
 )
 
 
@@ -319,6 +323,9 @@ class InferenceHubMagpieTTSService(TTSService):
         return True
 
     async def run_tts(self, text: str, context_id: str) -> AsyncGenerator[Frame, None]:
+        text = plain_conversation_text(text)
+        if not text:
+            return
         logger.debug("{}: Generating Magpie HTTPS speech [{}]", self, text)
         try:
             await self.start_tts_usage_metrics(text)
@@ -351,6 +358,17 @@ class InferenceHubMagpieTTSService(TTSService):
         except Exception as exc:
             logger.exception("{}: Magpie HTTPS synthesis failed", self)
             yield ErrorFrame(error=f"Magpie synthesis failed: {exc}")
+
+
+class PlainTextNvidiaTTSService(NvidiaTTSService):
+    """Prevent model formatting tokens from reaching NVIDIA's streaming TTS."""
+
+    async def run_tts(self, text: str, context_id: str) -> AsyncGenerator[Frame | None, None]:
+        text = plain_conversation_text(text)
+        if not text:
+            return
+        async for frame in super().run_tts(text, context_id):
+            yield frame
 
 
 def _build_llm(settings: AgentSettings) -> NvidiaLLMService:
@@ -413,7 +431,7 @@ async def run_agent_session(
             },
             settings=NvidiaSTTSettings(language=language),
         )
-        tts: TTSService = NvidiaTTSService(
+        tts: TTSService = PlainTextNvidiaTTSService(
             api_key=settings.grpc_api_key,
             server=settings.speech_server,
             use_ssl=True,

@@ -10,6 +10,7 @@ import zipfile
 from unittest.mock import patch
 
 import app
+from text_utils import plain_conversation_text
 
 
 class VoiceDeskIntegrationTests(unittest.TestCase):
@@ -114,7 +115,17 @@ class VoiceDeskIntegrationTests(unittest.TestCase):
         upstream.return_value = (
             200,
             {"Content-Type": "application/json"},
-            json.dumps({"choices": [{"message": {"content": "A concise answer."}}]}).encode(),
+            json.dumps(
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": "<think>draft</think>**A concise answer.**"
+                            }
+                        }
+                    ]
+                }
+            ).encode(),
         )
         status, _, body = self.request(
             "POST", "/api/chat", {"message": "What should I prioritize?", "history": []}
@@ -126,6 +137,23 @@ class VoiceDeskIntegrationTests(unittest.TestCase):
         sent = json.loads(outgoing.data)
         self.assertEqual(sent["messages"][-1]["content"], "What should I prioritize?")
         self.assertEqual(outgoing.headers["Authorization"], "Bearer test-key-never-sent-to-client")
+        self.assertIn("plain conversational text only", sent["messages"][0]["content"])
+
+    def test_markdown_is_normalized_for_display_and_speech(self) -> None:
+        response = (
+            "## **Summary**\n"
+            "* Read the [first chapter](https://example.test/chapter).\n"
+            "- Use `clear language`.\n"
+            "> This is *important*."
+        )
+
+        normalized = plain_conversation_text(response)
+
+        self.assertEqual(
+            normalized,
+            "Summary\nRead the first chapter.\nUse clear language.\nThis is important.",
+        )
+        self.assertNotIn("*", normalized)
 
     @patch("app._upstream_request")
     def test_uploaded_context_strictly_grounds_chat_and_can_be_cleared(self, upstream) -> None:
@@ -193,6 +221,7 @@ class VoiceDeskIntegrationTests(unittest.TestCase):
         self.assertIn("Revenue target", forwarded["request_data"]["document_context"])
 
     def test_docx_context_extraction_and_unsupported_type_validation(self) -> None:
+        self.assertEqual(app.MAX_CONTEXT_FILE_BYTES, 50 * 1024 * 1024)
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w") as archive:
             archive.writestr(
@@ -324,6 +353,7 @@ class VoiceDeskIntegrationTests(unittest.TestCase):
         self.assertIn("using only facts explicitly supported", grounded)
         self.assertIn("Travel reimbursement is capped at $500", grounded)
         self.assertIn("untrusted source material", grounded)
+        self.assertIn("plain conversational text only", grounded)
 
 
 if __name__ == "__main__":
