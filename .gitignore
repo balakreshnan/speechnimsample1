@@ -1,0 +1,46 @@
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Python virtual environments
+.venv/
+.python314/
+.tools/
+venv/
+env/
+ENV/
+virtualenv/
+venv.bak/
+env.bak/
+.conda/
+conda-env/
+pyvenv.cfg
+
+# Python tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+htmlcov/
+
+# Runtime caches and generated output
+.cache/
+output/
+outputs/
+*.log
+.run/
+nltk_data/
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
