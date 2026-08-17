@@ -207,22 +207,67 @@
                 <span>Language</span>
                 <span class="select-wrap">
                   <select id="languageSelect">
-                    <option value="en-US" selected>English (United States)</option>
-                    <option value="es-US">Spanish (United States)</option>
-                    <option value="fr-FR">French (France)</option>
+                    <option value="en-US" selected>English · en-US</option>
+                    <option value="es-US">Spanish · es-US</option>
+                    <option value="fr-FR">French · fr-FR</option>
+                    <option value="de-DE">German · de-DE</option>
+                    <option value="zh-CN">Mandarin · zh-CN</option>
+                    <option value="vi-VN">Vietnamese · vi-VN</option>
+                    <option value="it-IT">Italian · it-IT</option>
+                    <option value="hi-IN">Hindi · hi-IN</option>
+                    <option value="ja-JP">Japanese · ja-JP</option>
+                    <option value="ko-KR">Korean · ko-KR</option>
+                    <option value="ar-AR">Arabic · ar-AR</option>
+                    <option value="pt-BR">Portuguese · pt-BR</option>
                   </select>
                   <span class="material-symbols-rounded" aria-hidden="true">expand_more</span>
                 </span>
               </label>
               <label>
-                <span>Voice</span>
+                <span>Speaker</span>
                 <span class="select-wrap">
                   <select id="voiceSelect">
-                    <option value="Magpie-Multilingual.EN-US.Aria" selected>Aria · warm, clear</option>
+                    <option value="Aria" selected>Aria</option>
+                    <option value="Diego">Diego</option>
+                    <option value="Isabela">Isabela</option>
+                    <option value="Jason">Jason</option>
+                    <option value="Leo">Leo</option>
+                    <option value="Louise">Louise</option>
+                    <option value="Mia">Mia</option>
+                    <option value="Pascal">Pascal</option>
+                    <option value="Ray">Ray</option>
+                    <option value="Sofia">Sofia</option>
                   </select>
                   <span class="material-symbols-rounded" aria-hidden="true">expand_more</span>
                 </span>
               </label>
+              <label>
+                <span>Emotion</span>
+                <span class="select-wrap">
+                  <select id="emotionSelect">
+                    <option value="Angry">Angry · Angry tone</option>
+                    <option value="Calm">Calm · Calm tone</option>
+                    <option value="Fearful">Fearful · Fearful tone</option>
+                    <option value="Happy">Happy · Happy tone</option>
+                    <option value="Neutral" selected>Neutral · Neutral tone</option>
+                    <option value="Sad">Sad · Sad tone</option>
+                    <option value="PleasantSurprised">PleasantSurprised · Pleasantly surprised</option>
+                    <option value="Disgust">Disgust · Disgusted tone</option>
+                  </select>
+                  <span class="material-symbols-rounded" aria-hidden="true">expand_more</span>
+                </span>
+              </label>
+            </div>
+
+            <div class="voice-error" id="voiceError" role="alert" hidden>
+              <span class="material-symbols-rounded" aria-hidden="true">error</span>
+              <div>
+                <strong>Voice response unavailable</strong>
+                <span id="voiceErrorMessage">Choose another supported voice style and try again.</span>
+              </div>
+              <button class="voice-error-close" id="voiceErrorClose" type="button" aria-label="Dismiss voice error">
+                <span class="material-symbols-rounded" aria-hidden="true">close</span>
+              </button>
             </div>
 
             <div class="spoken-response" id="spokenResponse">

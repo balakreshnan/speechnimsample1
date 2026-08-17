@@ -50,6 +50,7 @@ from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 from pipecat.workers.runner import WorkerRunner
 
 from text_utils import plain_conversation_text
+from voice_catalog import build_magpie_voice, nvidia_language_code
 
 
 DEFAULT_AGENT_LLM_MODEL = "nvidia/nemotron-3-nano-30b-a3b"
@@ -79,6 +80,23 @@ SYSTEM_PROMPT = (
     "formatting markers. Use phrasing that sounds natural when read aloud and maintain "
     "context across turns."
 )
+
+
+def _user_facing_pipeline_error(error: object, speaker: str, emotion: str) -> str:
+    """Translate cloud/pipeline failures into safe, actionable UI messages."""
+
+    detail = str(error or "")
+    lowered = detail.lower()
+    if "subvoice requested not found" in lowered:
+        return (
+            f"{speaker or 'This speaker'} does not support the "
+            f"{emotion or 'selected'} emotion. Choose an enabled emotion and start a new session."
+        )
+    if "synthesis stream not started" in lowered:
+        return "NVIDIA voice synthesis could not start. Choose another voice style and try again."
+    if "tts" in lowered or "synthesis" in lowered:
+        return "NVIDIA could not create the spoken response. Start a new session and try again."
+    return "The voice agent encountered a service error. Start a new session and try again."
 
 
 @dataclass(frozen=True)
@@ -179,15 +197,25 @@ def get_agent_settings() -> AgentSettings:
 
 def _language(value: str) -> Language:
     try:
-        return Language(value)
+        return Language(nvidia_language_code(value))
     except ValueError:
         return Language.EN_US
 
 
 def _session_preferences(request_data: Any, settings: AgentSettings) -> tuple[Language, str]:
     data = request_data if isinstance(request_data, dict) else {}
-    language = _language(str(data.get("language", "en-US")))
-    voice = str(data.get("voice", settings.default_voice)).strip()
+    requested_language = str(data.get("language", "en-US"))
+    language = _language(requested_language)
+    speaker = str(data.get("speaker", "")).strip()
+    emotion = str(data.get("emotion", "")).strip()
+    try:
+        voice = (
+            build_magpie_voice(requested_language, speaker, emotion)
+            if speaker or emotion
+            else str(data.get("voice", settings.default_voice)).strip()
+        )
+    except ValueError:
+        voice = settings.default_voice
     if not voice or len(voice) > 100:
         voice = settings.default_voice
     return language, voice
@@ -401,6 +429,9 @@ async def run_agent_session(
     session_task = asyncio.current_task()
     shutdown_started = False
     language, voice = _session_preferences(request_data, settings)
+    session_data = request_data if isinstance(request_data, dict) else {}
+    selected_speaker = str(session_data.get("speaker", "")).strip()
+    selected_emotion = str(session_data.get("emotion", "")).strip()
     transport = SmallWebRTCTransport(
         webrtc_connection=connection,
         params=TransportParams(
@@ -483,6 +514,22 @@ async def run_agent_session(
     async def on_client_message(_rtvi, message):
         if message.type == "stop-response":
             await worker.queue_frame(InterruptionFrame())
+
+    reported_errors: set[str] = set()
+
+    @worker.event_handler("on_pipeline_error")
+    async def on_pipeline_error(_worker, frame):
+        message = _user_facing_pipeline_error(
+            frame.error,
+            selected_speaker,
+            selected_emotion,
+        )
+        if message in reported_errors:
+            return
+        if "synthesis stream not started" in str(frame.error).lower() and reported_errors:
+            return
+        reported_errors.add(message)
+        await worker.rtvi.send_error(message)
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(_transport, _client):

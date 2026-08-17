@@ -27,6 +27,7 @@ from xml.etree import ElementTree
 from pypdf import PdfReader
 
 from text_utils import plain_conversation_text
+from voice_catalog import build_magpie_voice, nvidia_language_code, public_voice_catalog
 
 
 ROOT = Path(__file__).resolve().parent
@@ -620,6 +621,7 @@ class VoiceDeskHandler(BaseHTTPRequestHandler):
                     "api_key_configured": bool(settings.api_key),
                     "chat_model": settings.chat_model,
                     "tts_model": settings.tts_model,
+                    "voice_catalog": public_voice_catalog(),
                     "voice_agent": agent_health,
                 }
             )
@@ -703,6 +705,17 @@ class VoiceDeskHandler(BaseHTTPRequestHandler):
         forwarded = dict(payload)
         forwarded_data = dict(request_data)
         forwarded_data.pop("context_id", None)
+        if "speaker" in forwarded_data or "emotion" in forwarded_data:
+            try:
+                requested_language = str(forwarded_data.get("language", "en-US")).strip()
+                speaker = str(forwarded_data.get("speaker", "")).strip()
+                emotion = str(forwarded_data.get("emotion", "")).strip()
+                forwarded_data["language"] = nvidia_language_code(requested_language)
+                forwarded_data["voice"] = build_magpie_voice(
+                    requested_language, speaker, emotion
+                )
+            except ValueError as exc:
+                raise ApiError(str(exc), HTTPStatus.BAD_REQUEST) from exc
         if context:
             forwarded_data["document_context"] = context.text
             forwarded_data["context_filename"] = context.filename
@@ -730,14 +743,20 @@ class VoiceDeskHandler(BaseHTTPRequestHandler):
 
     def handle_synthesize(self, payload: dict[str, Any]) -> None:
         text = str(payload.get("text", "")).strip()
-        language = str(payload.get("language", "en-US")).strip()[:20]
+        requested_language = str(payload.get("language", "en-US")).strip()[:20]
+        speaker = str(payload.get("speaker", "")).strip()
+        emotion = str(payload.get("emotion", "")).strip()
         voice = str(payload.get("voice", "Magpie-Multilingual.EN-US.Aria")).strip()[:100]
         if not text:
             raise ApiError("There is no response to speak.", HTTPStatus.BAD_REQUEST)
         if len(text) > 5000:
             raise ApiError("Spoken responses must be under 5,000 characters.", HTTPStatus.BAD_REQUEST)
-        if not re.fullmatch(r"[A-Za-z]{2,3}(?:-[A-Za-z]{2,4})?", language):
-            raise ApiError("Invalid language code.", HTTPStatus.BAD_REQUEST)
+        try:
+            language = nvidia_language_code(requested_language)
+            if speaker or emotion:
+                voice = build_magpie_voice(requested_language, speaker, emotion)
+        except ValueError as exc:
+            raise ApiError(str(exc), HTTPStatus.BAD_REQUEST) from exc
         if not re.fullmatch(r"[A-Za-z0-9._-]+", voice):
             raise ApiError("Invalid voice name.", HTTPStatus.BAD_REQUEST)
 

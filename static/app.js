@@ -20,6 +20,7 @@ const elements = {
   contextUploadLabel: document.querySelector("#contextUploadLabel"),
   dialogCloseButton: document.querySelector("#dialogCloseButton"),
   dialogDoneButton: document.querySelector("#dialogDoneButton"),
+  emotionSelect: document.querySelector("#emotionSelect"),
   languageSelect: document.querySelector("#languageSelect"),
   micButton: document.querySelector("#micButton"),
   modeBadge: document.querySelector("#modeBadge"),
@@ -38,6 +39,9 @@ const elements = {
   toast: document.querySelector("#toast"),
   transcriptWordCount: document.querySelector("#transcriptWordCount"),
   voiceSelect: document.querySelector("#voiceSelect"),
+  voiceError: document.querySelector("#voiceError"),
+  voiceErrorClose: document.querySelector("#voiceErrorClose"),
+  voiceErrorMessage: document.querySelector("#voiceErrorMessage"),
   voiceStage: document.querySelector("#voiceStage"),
   voiceStatusDetail: document.querySelector("#voiceStatusDetail"),
   voiceStatusTitle: document.querySelector("#voiceStatusTitle"),
@@ -58,12 +62,6 @@ function hydrateIcons(root = document) {
 }
 
 hydrateIcons();
-
-const voiceOptions = {
-  "en-US": [{ value: "Magpie-Multilingual.EN-US.Aria", label: "Aria - warm, clear" }],
-  "es-US": [{ value: "Magpie-Multilingual.ES-US.Diego", label: "Diego - confident" }],
-  "fr-FR": [{ value: "Magpie-Multilingual.FR-FR.Louise", label: "Louise - polished" }],
-};
 
 const state = {
   activeTab: "voice",
@@ -92,6 +90,8 @@ const state = {
   toastTimer: null,
   transcript: "",
   voiceApiReady: false,
+  voiceCatalog: null,
+  voiceError: "",
 };
 
 const modeCopy = {
@@ -134,6 +134,44 @@ function showToast(message) {
   elements.toast.textContent = message;
   elements.toast.classList.add("show");
   state.toastTimer = window.setTimeout(() => elements.toast.classList.remove("show"), 4200);
+}
+
+function clearVoiceError({ restoreStatus = false } = {}) {
+  const hadError = Boolean(state.voiceError);
+  state.voiceError = "";
+  elements.voiceError.hidden = true;
+  elements.voiceErrorMessage.textContent = "";
+  if (restoreStatus && hadError) {
+    setMode(state.recording ? (state.muted ? "muted" : "listening") : "ready");
+  }
+}
+
+function showVoiceError(message) {
+  const detail = String(message || "The NVIDIA voice service could not create this response.").trim();
+  state.voiceError = detail;
+  elements.voiceErrorMessage.textContent = detail;
+  elements.voiceError.hidden = false;
+  elements.stopVoiceButton.disabled = true;
+  setMode("ready", "Voice response unavailable", detail, "Voice error");
+  showToast(detail);
+}
+
+function applyVoiceCompatibility() {
+  const speaker = elements.voiceSelect.value;
+  const supported = new Set(
+    state.voiceCatalog?.speakers?.[speaker]?.emotions || ["Neutral"],
+  );
+  Array.from(elements.emotionSelect.options).forEach((option) => {
+    option.disabled = !supported.has(option.value);
+    option.title = option.disabled
+      ? `Not available for ${speaker}`
+      : `${option.value} is available for ${speaker}`;
+  });
+  if (!supported.has(elements.emotionSelect.value)) {
+    elements.emotionSelect.value = supported.has("Neutral")
+      ? "Neutral"
+      : Array.from(supported)[0];
+  }
 }
 
 function syncContextControls() {
@@ -286,7 +324,9 @@ function handleAgentMessage(event) {
       elements.stopVoiceButton.disabled = true;
       state.outputSuppressed = false;
       elements.responseAudio.muted = false;
-      setMode(state.recording ? (state.muted ? "muted" : "listening") : "ready", "Response complete", "Start another recording whenever you are ready.", "Response complete");
+      if (!state.voiceError) {
+        setMode(state.recording ? (state.muted ? "muted" : "listening") : "ready", "Response complete", "Start another recording whenever you are ready.", "Response complete");
+      }
       break;
     case "server-message":
       if (data.type === "user-turn-finalized" && data.transcript) {
@@ -296,7 +336,7 @@ function handleAgentMessage(event) {
       break;
     case "error":
     case "error-response":
-      showToast(data.error || "The live agent reported an error.");
+      showVoiceError(data.error || "The live agent reported an error.");
       break;
     default:
       break;
@@ -382,7 +422,8 @@ async function connectVoiceAgent() {
       type: pc.localDescription.type,
       request_data: {
         language: elements.languageSelect.value,
-        voice: elements.voiceSelect.value,
+        speaker: elements.voiceSelect.value,
+        emotion: elements.emotionSelect.value,
         ...(state.contextActive ? { context_id: state.contextId } : {}),
       },
     }),
@@ -426,6 +467,7 @@ async function disconnectVoiceAgent({ notify = true } = {}) {
 }
 
 async function startRecording() {
+  clearVoiceError();
   if (!state.voiceApiReady) {
     showToast("Add a valid NVIDIA_BUILD_API_KEY to .env, then restart the app.");
     return;
@@ -495,6 +537,7 @@ function stopSpokenResponse({ quiet = false } = {}) {
 
 async function resetVoiceSession({ quiet = false } = {}) {
   await disconnectVoiceAgent();
+  clearVoiceError();
   state.finalTranscript = "";
   setTranscript("");
   setMode(state.muted ? "muted" : "ready");
@@ -696,19 +739,14 @@ async function clearContextFile() {
   }
 }
 
-function updateVoiceOptions() {
-  const options = voiceOptions[elements.languageSelect.value] || voiceOptions["en-US"];
-  elements.voiceSelect.replaceChildren();
-  options.forEach((voice) => {
-    const option = document.createElement("option");
-    option.value = voice.value;
-    option.textContent = voice.label;
-    elements.voiceSelect.append(option);
-  });
+async function handleVoiceSettingsChange() {
+  applyVoiceCompatibility();
+  clearVoiceError();
   if (state.peerConnection) {
-    resetVoiceSession({ quiet: true });
-    showToast("Language changed. The next recording starts a new agent session.");
+    await resetVoiceSession({ quiet: true });
   }
+  const language = elements.languageSelect.selectedOptions[0]?.textContent.split("·")[0].trim();
+  showToast(`${language}, ${elements.voiceSelect.value}, ${elements.emotionSelect.value} selected.`);
 }
 
 async function loadHealth() {
@@ -718,6 +756,8 @@ async function loadHealth() {
     state.chatApiReady = health.api_key_configured;
     state.voiceApiReady = health.voice_agent?.api_key_configured === true;
     state.agentAvailable = health.voice_agent?.status === "ready";
+    state.voiceCatalog = health.voice_catalog || null;
+    applyVoiceCompatibility();
     const connected = state.voiceApiReady && state.agentAvailable;
     elements.connectionChip.classList.toggle("needs-setup", !connected);
     elements.connectionLabel.textContent = connected ? "Voice agent ready" : state.voiceApiReady ? "Agent unavailable" : "API key needed";
@@ -738,10 +778,13 @@ elements.micButton.addEventListener("click", toggleRecording);
 elements.recordButton.addEventListener("click", toggleRecording);
 elements.muteButton.addEventListener("click", toggleMute);
 elements.stopVoiceButton.addEventListener("click", () => stopSpokenResponse());
+elements.voiceErrorClose.addEventListener("click", () => clearVoiceError({ restoreStatus: true }));
 elements.resetVoiceButton.addEventListener("click", () => resetVoiceSession());
 elements.resetChatButton.addEventListener("click", () => resetChat());
 elements.chatSendButton.addEventListener("click", sendChatMessage);
-elements.languageSelect.addEventListener("change", updateVoiceOptions);
+elements.languageSelect.addEventListener("change", handleVoiceSettingsChange);
+elements.voiceSelect.addEventListener("change", handleVoiceSettingsChange);
+elements.emotionSelect.addEventListener("change", handleVoiceSettingsChange);
 elements.contextUploadButton.addEventListener("click", () => elements.contextFileInput.click());
 elements.contextFileInput.addEventListener("change", () => {
   const [file] = elements.contextFileInput.files;
@@ -779,5 +822,4 @@ window.addEventListener("beforeunload", () => {
 
 syncControls();
 setTranscript("");
-updateVoiceOptions();
 loadHealth();
